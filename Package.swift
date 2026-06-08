@@ -18,6 +18,7 @@ let package = Package(
     products: [
         .executable(name: "stlc", targets: ["Solve"]),
         .executable(name: "stlc-sampler", targets: ["stlc-sampler"]),
+        .executable(name: "stlc-diff", targets: ["stlc-diff"]),
     ],
     dependencies: [
         .package(path: "../PropertyTestingKit"),
@@ -47,6 +48,17 @@ let package = Package(
         .executableTarget(
             name: "stlc-sampler",
             dependencies: ["STLCGen"],
+            swiftSettings: sanitize
+        ),
+        // Differential-oracle helper: stdin terms -> type + normal form, for
+        // cross-checking against the independent Rust reference implementation.
+        .executableTarget(
+            name: "stlc-diff",
+            dependencies: [
+                "STLC",
+                // Provides the SanitizerCoverage runtime for the instrumented STLC module.
+                .product(name: "PropertyTestingKit", package: "PropertyTestingKit"),
+            ],
             swiftSettings: sanitize
         ),
         .testTarget(

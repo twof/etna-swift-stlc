@@ -40,6 +40,27 @@ witness evaluates to `Some true` on the clean implementation
 (`Tests/STLCTests/OracleTests`) and becomes a counterexample only once its
 mutant is active.
 
+### Differential validation against the Rust reference
+
+Preservation passing on clean is necessary but not sufficient (a `getTyp` bug
+could hide). To validate the *implementation itself*, the `stlc-diff` executable
+prints, per input term, the inferred type + the 40-step normal form in canonical
+wire form. Running it and the matching `diff_oracle` bin in
+[etna-rust-stlc](https://github.com/alpaylan/etna-rust-stlc) over a shared corpus
+and diffing the output is a true differential oracle for `getTyp` / `shift` /
+`subst` / `substTop` / `pstep`:
+
+```bash
+./scripts/run-stlc.sh ... # build first; then:
+.build/debug/stlc-diff < corpus.txt        # this port
+.../etna-rust-stlc/target/debug/diff_oracle < corpus.txt   # reference
+```
+
+Verified: **0 differences** on 2007 terms (20 witnesses + 2000 generated) for
+the clean implementations, and — activating each mutant in *both* via marauder —
+Swift-mutant output is **identical to Rust-mutant output for all 10 mutants**
+while differing from clean (the mutant bodies are faithful too).
+
 ### The generator is the crux
 
 A *type-based* generator of arbitrary `Expr`s is ill-typed almost always, so the

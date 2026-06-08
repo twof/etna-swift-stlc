@@ -1,0 +1,34 @@
+{
+  "setup_steps": [],
+  "build_steps": [
+    {
+      "Command": {
+        "command": "${workload_path}/scripts/swift-toolchain.sh",
+        "args": ["build"]
+      }
+    }
+  ],
+  "capabilities": {
+    "solve": [
+      {
+        "Command": {
+          "command": "${workload_path}/scripts/run-stlc.sh",
+          "args": ["${strategy}", "${property}", "${timeout}"],
+          "params": ["workload_path", "property", "strategy", "timeout"]
+        }
+      }
+    ],
+    "sample": [
+      {
+        "Command": {
+          "command": "${workload_path}/scripts/run-sampler.sh",
+          "args": ["${property}", "${tests}"],
+          "params": ["workload_path", "property", "tests"]
+        }
+      }
+    ]
+  },
+  "tags": {
+    "strategy": ["ptk"]
+  }
+}

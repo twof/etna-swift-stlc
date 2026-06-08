@@ -1,0 +1,17 @@
+.build/
+.swiftpm/
+*.xcodeproj
+.DS_Store
+etna.log
+
+# stray compiler artifacts
+*.d
+*.dia
+Package.resolved
+
+# Coq build artifacts
+*.vo
+*.vok
+*.vos
+*.glob
+.*.aux

@@ -1,0 +1,32 @@
+# Registers Swift as a marauder custom language so ETNA's driver can apply the
+# source-swap mutants in Sources/RBT/Lang.swift. Swift is not one of marauder's
+# built-in languages (Rocq/Haskell/Racket/Rust/OCaml/Python/Lean), so without
+# this the driver aborts with "language 'Swift' is not known or supported".
+#
+# ETNA reads this at the EXPERIMENT root (to accept language=Swift) and at the
+# WORKLOAD dir (to find the .swift variants). Point both at this file with:
+#
+#   export MARAUDER_CONFIG="$PWD/workloads/stlc-swift/marauder.toml"
+#   etna experiment run --tests stlc-swift
+#
+# Swift block comments are identical to Rust's, so we use the same `/* */`
+# delimiters and the `|` mutation marker. A variant block looks like:
+#
+#   /*| balance */       <- clean (active) body follows
+#   ...clean...
+#   /*|| swap_cd */      <- variant header
+#   /*|
+#   ...mutant body...    <- commented out until activated
+#   */
+#   /* |*/               <- end
+
+languages = []
+ignore = []
+use_gitignore = true
+
+[[custom_languages]]
+name = "Swift"
+extension = "swift"
+comment_begin = "/*"
+comment_end = "*/"
+mutation_marker = "|"

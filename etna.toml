@@ -1,0 +1,101 @@
+name = "stlc-swift"
+language = "Swift"
+description = "Simply-typed lambda calculus workload (Swift / PropertyTestingKit, coverage-guided)."
+strategies = ["ptk"]
+
+# Ported from the canonical ETNA STLC workload (jwshii/etna, mirrored by
+# alpaylan/etna-rust-stlc) — same 10 substitution mutants, 2 properties, and
+# ground-truth witnesses. Witnesses are single terms in ETNA wire form
+# (`(Var i)`, `(Bool #t|#f)`, `(Abs <typ> <body>)`, `(App <f> <a>)`, with `TBool`
+# / `(TFun <t1> <t2>)`). The decoder also accepts the parenthesized `(TBool)`
+# spelling the Rust port's `Display` emits.
+#
+# Mutants are applied via ETNA's marauder source-swap + recompile (the active
+# variant lives in Sources/STLC/Lang.swift, in `shift`/`subst`/`substTop`);
+# marauder.toml registers Swift as a custom language. Type preservation is a
+# theorem for the clean calculus, so each witness below evaluates to `Some true`
+# on the clean implementation (verified by Tests/STLCTests/OracleTests) and is a
+# counterexample for the named property once its mutant is active.
+
+mutations = [
+  "shift_var_none",
+  "shift_var_all",
+  "shift_var_leq",
+  "shift_abs_no_incr",
+  "subst_var_all",
+  "subst_var_none",
+  "subst_abs_no_shift",
+  "subst_abs_no_incr",
+  "substTop_no_shift",
+  "substTop_no_shift_back",
+]
+
+[[tasks]]
+mutations = ["shift_var_none"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(Abs TBool (App (Abs TBool (Var 1)) (Bool #t)))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(Abs TBool (App (Abs TBool (Var 1)) (Bool #t)))" }] },
+]
+
+[[tasks]]
+mutations = ["shift_var_all"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(App (Abs TBool (Abs TBool (Var 0))) (Bool #t))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(App (Abs TBool (Abs TBool (Var 0))) (Bool #t))" }] },
+]
+
+[[tasks]]
+mutations = ["shift_var_leq"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(App (Abs TBool (App (Abs TBool (Abs (TFun TBool TBool) (Var 1))) (Var 0))) (Bool #t))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(App (Abs TBool (App (Abs TBool (Abs (TFun TBool TBool) (Var 1))) (Var 0))) (Bool #t))" }] },
+]
+
+[[tasks]]
+mutations = ["shift_abs_no_incr"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(App (Abs TBool (Abs TBool (Var 0))) (Bool #t))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(App (Abs TBool (Abs TBool (Var 0))) (Bool #t))" }] },
+]
+
+[[tasks]]
+mutations = ["subst_var_all"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(Abs (TFun TBool TBool) (App (Abs TBool (Var 1)) (Bool #t)))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(Abs (TFun TBool TBool) (App (Abs TBool (Var 1)) (Bool #t)))" }] },
+]
+
+[[tasks]]
+mutations = ["subst_var_none"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(App (Abs TBool (Var 0)) (Bool #t))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(App (Abs TBool (Var 0)) (Bool #t))" }] },
+]
+
+[[tasks]]
+mutations = ["subst_abs_no_shift"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(App (Abs TBool (App (Abs TBool (Abs (TFun TBool TBool) (Var 1))) (Var 0))) (Bool #t))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(App (Abs TBool (App (Abs TBool (Abs (TFun TBool TBool) (Var 1))) (Var 0))) (Bool #t))" }] },
+]
+
+[[tasks]]
+mutations = ["subst_abs_no_incr"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(App (Abs TBool (Abs (TFun TBool TBool) (Var 1))) (Bool #t))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(App (Abs TBool (Abs (TFun TBool TBool) (Var 1))) (Bool #t))" }] },
+]
+
+[[tasks]]
+mutations = ["substTop_no_shift"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(Abs TBool (App (Abs TBool (Var 1)) (Bool #t)))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(Abs TBool (App (Abs TBool (Var 1)) (Bool #t)))" }] },
+]
+
+[[tasks]]
+mutations = ["substTop_no_shift_back"]
+tasks = [
+  { property = "SinglePreserve", witnesses = [{ input = "(Abs TBool (App (Abs TBool (Var 0)) (Var 0)))" }] },
+  { property = "MultiPreserve", witnesses = [{ input = "(Abs TBool (App (Abs TBool (Var 0)) (Var 0)))" }] },
+]

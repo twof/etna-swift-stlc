@@ -17,7 +17,7 @@ guard args.count >= 3 else {
     exit(2)
 }
 
-let strategy = args[1]   // e.g. "ptk"; accepted and ignored (one strategy)
+let strategy = args[1]   // ETNA strategy name; selects the PTK coverage strategy (see coverageStrategy(named:))
 let property = args[2]
 // ETNA passes its per-task `timeout` as the 3rd arg (e.g. "8" or "60.0"); we
 // fuzz for that budget. ETNA hard-kills the process at `timeout`, so we shave a
@@ -25,10 +25,9 @@ let property = args[2]
 let timeoutSecs = args.count >= 4 ? (Double(args[3]) ?? 10) : 10
 let durationSecs = max(timeoutSecs - 0.5, 0.5)
 
-_ = strategy
-
 do {
-    let outcome = try await solve(property: property, duration: .seconds(durationSecs))
+    let outcome = try await solve(property: property, duration: .seconds(durationSecs),
+                                  coverageStrategy: coverageStrategy(named: strategy))
     print(outcome.json)
 } catch {
     let aborted = SolveOutcome(status: "aborted", tests: 0, discards: 0,

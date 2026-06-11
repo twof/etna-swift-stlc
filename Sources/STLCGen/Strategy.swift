@@ -67,6 +67,7 @@ let enginesParallelism: Int = {
 /// term), `true` a pass.
 private func runFuzz(
     duration: Duration,
+    coverageStrategy: CoverageStrategy,
     check: @escaping @Sendable (Expr) -> Bool?
 ) async -> SolveOutcome {
     let discards = OSAllocatedUnfairLock(initialState: 0)
@@ -77,6 +78,7 @@ private func runFuzz(
         let result = try await fuzz(
             duration: duration,
             persistence: .ephemeral,
+            coverageStrategy: coverageStrategy,
             parallelism: enginesParallelism,
             plugins: { [.corpusMutation(), .stopOnFirstFailure(reason: .custom("counterexample_found"))] }
         ) { (input: Expr) in
@@ -105,16 +107,33 @@ private func runFuzz(
 /// All property names this workload understands (matches `etna.toml`).
 public let stlcProperties = ["SinglePreserve", "MultiPreserve"]
 
-public enum SolveError: Error { case unknownProperty(String) }
+public enum SolveError: Error { case unknownProperty(String), unknownStrategy(String) }
 
-/// Coverage-guided solve: fuzz `property` for `duration`. The mutant under test
-/// is whichever marauder variant is active in the compiled `STLC` module.
-public func solve(property: String, duration: Duration) async throws -> SolveOutcome {
+/// The PTK coverage strategies this workload exposes as ETNA strategy names.
+/// `ptk` stays as a back-compat alias for the default (`.pathTrie`).
+public func coverageStrategy(named name: String) throws -> CoverageStrategy {
+    switch name {
+    case "ptk", "ptk-pathtrie": return .pathTrie
+    case "ptk-signaturematch": return .signatureMatch
+    case "ptk-newedge": return .newEdge
+    case "ptk-hitcountbuckets": return .hitCountBuckets
+    default: throw SolveError.unknownStrategy(name)
+    }
+}
+
+/// Coverage-guided solve: fuzz `property` for `duration` judging novelty with
+/// `coverageStrategy`. The mutant under test is whichever marauder variant is
+/// active in the compiled `STLC` module.
+public func solve(
+    property: String,
+    duration: Duration,
+    coverageStrategy: CoverageStrategy = .pathTrie
+) async throws -> SolveOutcome {
     switch property {
     case "SinglePreserve":
-        return await runFuzz(duration: duration, check: { prop_single_preserve($0) })
+        return await runFuzz(duration: duration, coverageStrategy: coverageStrategy, check: { prop_single_preserve($0) })
     case "MultiPreserve":
-        return await runFuzz(duration: duration, check: { prop_multi_preserve($0) })
+        return await runFuzz(duration: duration, coverageStrategy: coverageStrategy, check: { prop_multi_preserve($0) })
     default:
         throw SolveError.unknownProperty(property)
     }

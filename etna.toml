@@ -1,7 +1,7 @@
 name = "stlc-swift"
 language = "Swift"
 description = "Simply-typed lambda calculus workload (Swift / PropertyTestingKit, coverage-guided)."
-strategies = ["ptk"]
+strategies = ["ptk-pathtrie", "ptk-signaturematch", "ptk-newedge", "ptk-hitcountbuckets"]
 
 # Ported from the canonical ETNA STLC workload (jwshii/etna, mirrored by
 # alpaylan/etna-rust-stlc) — same 10 substitution mutants, 2 properties, and

@@ -29,6 +29,6 @@
     ]
   },
   "tags": {
-    "strategy": ["ptk"]
+    "strategy": ["ptk-pathtrie", "ptk-signaturematch", "ptk-newedge", "ptk-hitcountbuckets"]
   }
 }

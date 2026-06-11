@@ -80,7 +80,13 @@ private func runFuzz(
             persistence: .ephemeral,
             coverageStrategy: coverageStrategy,
             parallelism: enginesParallelism,
-            plugins: { [.corpusMutation(), .stopOnFirstFailure(reason: .custom("counterexample_found"))] }
+            // PTK_SCHEDULER=entropic swaps uniform corpus replay for PTK's
+            // Entropic energy scheduler (rare-feature entropy weighting).
+            plugins: { [
+                ProcessInfo.processInfo.environment["PTK_SCHEDULER"] == "entropic"
+                    ? .energyMutation() : .corpusMutation(),
+                .stopOnFirstFailure(reason: .custom("counterexample_found")),
+            ] }
         ) { (input: Expr) in
             switch check(input) {
             case .some(false): throw PropertyViolation(wire: input.description)

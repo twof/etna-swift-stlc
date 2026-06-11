@@ -4,7 +4,11 @@
     {
       "Command": {
         "command": "${workload_path}/scripts/swift-toolchain.sh",
-        "args": ["build"]
+        "args": [
+          "build",
+          "--product",
+          "stlc"
+        ]
       }
     }
   ],
@@ -13,8 +17,17 @@
       {
         "Command": {
           "command": "${workload_path}/scripts/run-stlc.sh",
-          "args": ["${strategy}", "${property}", "${timeout}"],
-          "params": ["workload_path", "property", "strategy", "timeout"]
+          "args": [
+            "${strategy}",
+            "${property}",
+            "${timeout}"
+          ],
+          "params": [
+            "workload_path",
+            "property",
+            "strategy",
+            "timeout"
+          ]
         }
       }
     ],
@@ -22,13 +35,25 @@
       {
         "Command": {
           "command": "${workload_path}/scripts/run-sampler.sh",
-          "args": ["${property}", "${tests}"],
-          "params": ["workload_path", "property", "tests"]
+          "args": [
+            "${property}",
+            "${tests}"
+          ],
+          "params": [
+            "workload_path",
+            "property",
+            "tests"
+          ]
         }
       }
     ]
   },
   "tags": {
-    "strategy": ["ptk-pathtrie", "ptk-signaturematch", "ptk-newedge", "ptk-hitcountbuckets"]
+    "strategy": [
+      "ptk-pathtrie",
+      "ptk-signaturematch",
+      "ptk-newedge",
+      "ptk-hitcountbuckets"
+    ]
   }
 }

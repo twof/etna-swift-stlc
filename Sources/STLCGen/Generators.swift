@@ -97,7 +97,7 @@ func genExpr(_ rng: inout FastRNG) -> Expr {
 // ill-typed (the property discards those). The key well-typed move is wrapping
 // in an identity redex `(λx:T. x) e`, which manufactures a β-redex so the
 // fuzzer can drive coverage into the substitution paths even from a normal form.
-func mutateExpr(_ e: Expr) -> [Expr] {
+func mutateExpr(_ e: Expr, _ rng: inout FastRNG) -> Expr {
     var out: [Expr] = []
     if let t = mt(e) {
         out.append(.App(.Abs(t, .Var(0)), e))   // identity redex → reduces to e
@@ -114,7 +114,8 @@ func mutateExpr(_ e: Expr) -> [Expr] {
         out.append(.Var(i + 1))
         if i > 0 { out.append(.Var(i - 1)) }
     }
-    return out
+    guard !out.isEmpty else { return e }
+    return out[Int.random(in: 0..<out.count, using: &rng)]
 }
 
 extension Expr: MutatorProviding {
@@ -127,7 +128,7 @@ extension Expr: MutatorProviding {
                 .App(.Abs(.TBool, .Abs(.TBool, .Var(0))), .Bool(false)),
                 .Bool(true),
             ],
-            mutate: { mutateExpr($0) },
+            mutate: { mutateExpr($0, &$1) },
             generate: { genExpr(&$0) }
         )
     }

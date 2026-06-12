@@ -80,11 +80,9 @@ private func runFuzz(
             persistence: .ephemeral,
             coverageStrategy: coverageStrategy,
             parallelism: enginesParallelism,
-            // PTK_SCHEDULER=entropic swaps uniform corpus replay for PTK's
-            // Entropic energy scheduler (rare-feature entropy weighting).
+            // Mutation scheduling is PTK's pool scheduler (default
+            // .weightedPool()); the bus carries only the stop observer.
             plugins: { [
-                ProcessInfo.processInfo.environment["PTK_SCHEDULER"] == "entropic"
-                    ? .energyMutation() : .corpusMutation(),
                 .stopOnFirstFailure(reason: .custom("counterexample_found")),
             ] }
         ) { (input: Expr) in

@@ -81,15 +81,33 @@ private func runFuzz(
             coverageStrategy: coverageStrategy,
             // PTK_SCHEDULER selects the pool configuration: "culled" bounds
             // the pool by feature ownership, "entropic" weights draws by
-            // rare-feature information gain, "entropic-culled" composes both.
+            // rare-feature information gain, "entropic-culled" composes both,
+            // "entropic-culled-burst" adds entropic per-entry burst lengths.
+            // PTK_FOCUS_ON_INSERT=0 disables burst-on-accept;
+            // PTK_POOL_CAPACITY bounds pool residence.
             scheduler: {
-                switch ProcessInfo.processInfo.environment["PTK_SCHEDULER"] {
-                case "culled": return .weightedPool(admission: .featureOwnership)
-                case "entropic": return .weightedPool(policies: { [EntropicWeightPolicy()] })
+                let env = ProcessInfo.processInfo.environment
+                let admission: PoolAdmission
+                let base: @Sendable () -> [any PoolPlugin]
+                switch env["PTK_SCHEDULER"] {
+                case "culled":
+                    admission = .featureOwnership; base = { [] }
+                case "entropic":
+                    admission = .everyDiscovery; base = { [EntropicWeightPolicy()] }
                 case "entropic-culled":
-                    return .weightedPool(admission: .featureOwnership, policies: { [EntropicWeightPolicy()] })
-                default: return .weightedPool()
+                    admission = .featureOwnership; base = { [EntropicWeightPolicy()] }
+                case "entropic-culled-burst":
+                    // TODO: pass adviseBurstLength: 16 once PTK stage 5 lands.
+                    admission = .featureOwnership; base = { [EntropicWeightPolicy()] }
+                default:
+                    admission = .everyDiscovery; base = { [] }
                 }
+                return .weightedPool(
+                    admission: admission,
+                    policies: base,
+                    focusOnInsert: env["PTK_FOCUS_ON_INSERT"] != "0",
+                    capacity: env["PTK_POOL_CAPACITY"].flatMap(Int.init)
+                )
             }(),
             parallelism: enginesParallelism,
             plugins: { [
@@ -127,7 +145,16 @@ public enum SolveError: Error { case unknownProperty(String), unknownStrategy(St
 /// `ptk` stays as a back-compat alias for the default (`.pathTrie`).
 public func coverageStrategy(named name: String) throws -> CoverageStrategy {
     switch name {
-    case "ptk", "ptk-pathtrie": return .pathTrie
+    case "ptk", "ptk-pathtrie":
+        // PTK_PATHTRIE_VOCAB selects the culling vocabulary: "edges" opts out
+        // of grams (pre-stage-4 behavior); an integer sets the gram length.
+        switch ProcessInfo.processInfo.environment["PTK_PATHTRIE_VOCAB"] {
+        case "edges": return .pathTrie(gramLength: nil)
+        case let .some(v):
+            guard let k = Int(v) else { return .pathTrie }
+            return .pathTrie(gramLength: k)
+        case nil: return .pathTrie
+        }
     case "ptk-signaturematch": return .signatureMatch
     case "ptk-newedge": return .newEdge
     case "ptk-hitcountbuckets": return .hitCountBuckets

@@ -129,7 +129,10 @@ extension Expr: MutatorProviding {
                 .Bool(true),
             ],
             mutate: { mutateExpr($0, &$1) },
-            generate: { genExpr(&$0) }
+            generate: { genExpr(&$0) },
+            // Real REDUCE/eviction size metric: wire length (the covered-edge
+            // proxy saturates once coverage does, hiding term drift).
+            size: { $0.description.count }
         )
     }
 }

@@ -79,10 +79,18 @@ private func runFuzz(
             duration: duration,
             persistence: .ephemeral,
             coverageStrategy: coverageStrategy,
-            // PTK_SCHEDULER=culled bounds the mutation pool by feature
-            // ownership (libFuzzer corpus model); default admits every accept.
-            scheduler: ProcessInfo.processInfo.environment["PTK_SCHEDULER"] == "culled"
-                ? .weightedPool(admission: .featureOwnership) : .weightedPool(),
+            // PTK_SCHEDULER selects the pool configuration: "culled" bounds
+            // the pool by feature ownership, "entropic" weights draws by
+            // rare-feature information gain, "entropic-culled" composes both.
+            scheduler: {
+                switch ProcessInfo.processInfo.environment["PTK_SCHEDULER"] {
+                case "culled": return .weightedPool(admission: .featureOwnership)
+                case "entropic": return .weightedPool(policies: { [EntropicWeightPolicy()] })
+                case "entropic-culled":
+                    return .weightedPool(admission: .featureOwnership, policies: { [EntropicWeightPolicy()] })
+                default: return .weightedPool()
+                }
+            }(),
             parallelism: enginesParallelism,
             plugins: { [
                 .stopOnFirstFailure(reason: .custom("counterexample_found")),

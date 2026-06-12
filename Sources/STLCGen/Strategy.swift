@@ -79,9 +79,11 @@ private func runFuzz(
             duration: duration,
             persistence: .ephemeral,
             coverageStrategy: coverageStrategy,
+            // PTK_SCHEDULER=culled bounds the mutation pool by feature
+            // ownership (libFuzzer corpus model); default admits every accept.
+            scheduler: ProcessInfo.processInfo.environment["PTK_SCHEDULER"] == "culled"
+                ? .weightedPool(admission: .featureOwnership) : .weightedPool(),
             parallelism: enginesParallelism,
-            // Mutation scheduling is PTK's pool scheduler (default
-            // .weightedPool()); the bus carries only the stop observer.
             plugins: { [
                 .stopOnFirstFailure(reason: .custom("counterexample_found")),
             ] }

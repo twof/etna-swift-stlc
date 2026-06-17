@@ -37,6 +37,13 @@ fi
 cd "$(dirname "$0")/.."
 
 CMD="${1:-build}"; shift || true
+
+# Coverage targets load PTK's LLVM pass plugins via -load-pass-plugin (see
+# Package.swift); build them from the sibling PropertyTestingKit checkout first.
+if [ "$CMD" != "env" ] && [ -x "../PropertyTestingKit/scripts/build-llvm-plugins.sh" ]; then
+    BUILD_ROOT="$BUILD_ROOT" ../PropertyTestingKit/scripts/build-llvm-plugins.sh
+fi
+
 case "$CMD" in
     build)
         DYLD_LIBRARY_PATH="$LOCAL_RUNTIME" SWIFT_EXEC="$LOCAL_SWIFTC" \

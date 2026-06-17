@@ -101,7 +101,7 @@ final class PoolProbe: PoolPlugin {
             case .queue:
                 flushRun()
             }
-        case let .inserted(_, coverage, _):
+        case let .inserted(_, coverage, _, _, _):
             inserts += 1
             insertSizes.append(coverage.count)
         case .removed: removes += 1

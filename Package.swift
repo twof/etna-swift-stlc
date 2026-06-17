@@ -25,6 +25,15 @@ let sanitize: [SwiftSetting] = [
     .unsafeFlags(["-sanitize=undefined", "-sanitize-coverage=edge,pc-table"] + loadPass("TagCompilerGenerated"))
 ]
 
+// SUT-only: edge + pc-table as above, plus the comparison channel. EmitCmpTrace
+// emits `__sanitizer_cov_trace_cmp*` for integer comparisons (skipping
+// trap-guards); TagCompilerGenerated must load FIRST so EmitCmpTrace honors its
+// NoSanitizeCoverage tags. Feeds PTK's boundary-distance / cmp strategies.
+let sanitizeCmp: [SwiftSetting] = [
+    .unsafeFlags(["-sanitize=undefined", "-sanitize-coverage=edge,pc-table"]
+        + loadPass("TagCompilerGenerated") + loadPass("EmitCmpTrace"))
+]
+
 let package = Package(
     name: "etna-swift-stlc",
     platforms: [.macOS(.v26)],
@@ -40,7 +49,7 @@ let package = Package(
         // System under test + spec + decoders. Instrumented for coverage.
         .target(
             name: "STLC",
-            swiftSettings: sanitize
+            swiftSettings: sanitizeCmp
         ),
         // PTK-backed generators + coverage-guided solve/sample strategy.
         .target(

@@ -76,7 +76,18 @@ final class PoolProbe: PoolPlugin {
     var inserts = 0
     var removes = 0
     var insertSizes: [Int] = []
+    /// Real expression size (wire `description.count`) of every admitted entry.
+    var insertExprSizes: [Int] = []
+    /// Live entries' real expression size, keyed by pool id; an entry drops out
+    /// on `.removed`, so at report time this is the size distribution of the
+    /// pool that actually survived (post-REDUCE).
+    var liveExprSize: [Int: Int] = [:]
     var runLengths: [Int] = []
+    /// The most recent accepted iteration's real input size, stashed so the
+    /// `.inserted` that immediately follows it (same task, same `observe` call)
+    /// can attribute the entry's true expression size — `.inserted` itself
+    /// carries only the coverage, not the input size.
+    private var lastInputSize: Int?
     private var currentParent: Int?
     private var currentRun = 0
 
@@ -84,7 +95,10 @@ final class PoolProbe: PoolPlugin {
         switch event {
         case let .iteration(outcome):
             iterations += 1
-            if outcome.newCoverage != nil { accepts += 1 }
+            if outcome.newCoverage != nil {
+                accepts += 1
+                lastInputSize = outcome.inputSize
+            }
             switch outcome.source {
             case let .pool(parent):
                 poolIterations += 1
@@ -101,10 +115,15 @@ final class PoolProbe: PoolPlugin {
             case .queue:
                 flushRun()
             }
-        case let .inserted(_, coverage, _, _, _):
+        case let .inserted(id, coverage, _, _, _):
             inserts += 1
             insertSizes.append(coverage.count)
-        case .removed: removes += 1
+            let exprSize = lastInputSize ?? coverage.count
+            insertExprSizes.append(exprSize)
+            liveExprSize[id] = exprSize
+        case let .removed(id):
+            removes += 1
+            liveExprSize[id] = nil
         case .willDraw: break
         }
         return []
@@ -150,6 +169,18 @@ final class ProbeCollector: @unchecked Sendable {
         let complete = runs.filter { $0 >= burstLength }.count
         let meanRun = runs.isEmpty ? 0 : Double(runs.reduce(0, +)) / Double(runs.count)
         func pct(_ a: Int, _ b: Int) -> String { b == 0 ? "n/a" : String(format: "%.1f%%", 100.0 * Double(a) / Double(b)) }
+        func stats(_ xs: [Int]) -> String {
+            guard !xs.isEmpty else { return "n=0" }
+            let s = xs.sorted()
+            let mean = Double(s.reduce(0, +)) / Double(s.count)
+            let med = s[s.count / 2]
+            let p90 = s[min(s.count - 1, s.count * 9 / 10)]
+            return "n=\(s.count) mean=\(String(format: "%.1f", mean)) med=\(med) p90=\(p90) max=\(s[s.count - 1])"
+        }
+        // Real expression size (wire length): of every admitted entry, and of
+        // the entries STILL LIVE at the end (post-REDUCE survivors).
+        let admittedExpr = probes.flatMap(\.insertExprSizes)
+        let liveExpr = probes.flatMap { Array($0.liveExprSize.values) }
         return """
         POOL_PROBE engines=\(probes.count) iters=\(iters) accepts=\(accepts) (\(pct(accepts, iters)) of iters) \
         inserts=\(inserts) (\(pct(inserts, accepts)) of accepts) removes=\(removes) \
@@ -157,6 +188,7 @@ final class ProbeCollector: @unchecked Sendable {
         iterMix pool=\(pct(pool, iters)) generated=\(pct(gen, iters)) \
         bursts=\(runs.count) complete=\(pct(complete, runs.count)) meanRun=\(String(format: "%.1f", meanRun)) \
         insertSize med=\(medSize) p90=\(p90Size)
+        POOL_PROBE exprSize admitted[\(stats(admittedExpr))] live[\(stats(liveExpr))]
         """
     }
 }
@@ -189,12 +221,17 @@ private func runFuzz(
             duration: duration,
             persistence: .ephemeral,
             coverageStrategy: coverageStrategy,
-            // PTK_SCHEDULER selects the pool configuration: "culled" bounds
-            // the pool by feature ownership, "entropic" weights draws by
-            // rare-feature information gain, "entropic-culled" composes both,
-            // "entropic-culled-burst" adds entropic per-entry burst lengths.
-            // PTK_FOCUS_ON_INSERT=0 disables burst-on-accept;
-            // PTK_POOL_CAPACITY bounds pool residence.
+            // PTK_SCHEDULER selects the pool configuration. The DEFAULT is
+            // feature-ownership culling (matches PTK's flipped library default):
+            // it bounds the pool to the smallest witness per feature, which on
+            // shift_var_leq found the bug 20/20 at median 4.0s vs everyDiscovery's
+            // 17/20 at 6.7s (a bloated pool of large terms mutates poorly).
+            // "everydiscovery" restores the old keep-everything behavior;
+            // "entropic" weights draws by rare-feature information gain;
+            // "entropic-culled" composes both; "entropic-culled-burst" adds
+            // entropic per-entry burst lengths; "boundary-culled" culls over the
+            // cmp boundary-distance axis too. PTK_FOCUS_ON_INSERT=0 disables
+            // burst-on-accept; PTK_POOL_CAPACITY bounds pool residence.
             scheduler: {
                 let env = ProcessInfo.processInfo.environment
                 let admission: PoolAdmission
@@ -202,6 +239,8 @@ private func runFuzz(
                 switch env["PTK_SCHEDULER"] {
                 case "culled":
                     admission = .featureOwnership; base = { [] }
+                case "everydiscovery":
+                    admission = .everyDiscovery; base = { [] }
                 case "entropic":
                     admission = .everyDiscovery; base = { [EntropicWeightPolicy()] }
                 case "entropic-culled":
@@ -209,8 +248,13 @@ private func runFuzz(
                 case "entropic-culled-burst":
                     // TODO: pass adviseBurstLength: 16 once PTK stage 5 lands.
                     admission = .featureOwnership; base = { [EntropicWeightPolicy()] }
+                case "boundary-culled":
+                    // Cull over both the (namespaced) features and the cmp
+                    // boundary distances — the admission half of a composed
+                    // cmp×edge strategy.
+                    admission = .boundaryDistanceOwnership; base = { [] }
                 default:
-                    admission = .everyDiscovery; base = { [] }
+                    admission = .featureOwnership; base = { [] }
                 }
                 let probe = env["PTK_POOL_PROBE"] == "1"
                 return .weightedPool(
@@ -281,6 +325,12 @@ public func coverageStrategy(named name: String) throws -> CoverageStrategy {
     case "ptk-signaturematch": return .signatureMatch
     case "ptk-newedge": return .newEdge
     case "ptk-hitcountbuckets": return .hitCountBuckets
+    // Comparison channel (requires the STLC SUT built with EmitCmpTrace).
+    case "ptk-boundary": return .boundaryDistance
+    // Composed: pathTrie edge novelty UNIONED with the cmp boundary-distance
+    // signal — the mix-and-match case under test.
+    case "ptk-pathtrie-boundary": return .pathTrie.combined(with: .boundaryDistanceOnly)
+    case "ptk-newedge-boundary": return .newEdge.combined(with: .boundaryDistanceOnly)
     default: throw SolveError.unknownStrategy(name)
     }
 }

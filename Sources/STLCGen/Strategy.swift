@@ -220,7 +220,6 @@ private func runFuzz(
         let result = try await fuzz(
             duration: duration,
             persistence: .ephemeral,
-            coverageStrategy: coverageStrategy,
             // PTK_SCHEDULER selects the pool configuration. The DEFAULT is
             // feature-ownership culling (matches PTK's flipped library default):
             // it bounds the pool to the smallest witness per feature, which on
@@ -270,7 +269,8 @@ private func runFuzz(
                         }
                         return policies
                     },
-                    capacity: env["PTK_POOL_CAPACITY"].flatMap(Int.init)
+                    capacity: env["PTK_POOL_CAPACITY"].flatMap(Int.init),
+                    coverageStrategy: coverageStrategy
                 )
             }(),
             parallelism: enginesParallelism,

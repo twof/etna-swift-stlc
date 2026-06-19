@@ -228,10 +228,11 @@ private func runFuzz(
             // 17/20 at 6.7s (a bloated pool of large terms mutates poorly).
             // "everydiscovery" restores the old keep-everything behavior;
             // "entropic" weights draws by rare-feature information gain;
-            // "entropic-culled" composes both; "entropic-culled-burst" adds
-            // entropic per-entry burst lengths; "boundary-culled" culls over the
-            // cmp boundary-distance axis too. PTK_FOCUS_ON_INSERT=0 disables
-            // burst-on-accept; PTK_POOL_CAPACITY bounds pool residence.
+            // "entropic-culled" composes both; "entropic-culled-burst" is now an
+            // alias of "entropic-culled" (PTK's per-entry burst model was
+            // superseded by the generation ratio); "boundary-culled" culls over
+            // the cmp boundary-distance axis too. PTK_POOL_CAPACITY bounds pool
+            // residence.
             scheduler: {
                 let env = ProcessInfo.processInfo.environment
                 let admission: PoolAdmission
@@ -246,7 +247,7 @@ private func runFuzz(
                 case "entropic-culled":
                     admission = .featureOwnership; base = { [EntropicWeightPolicy()] }
                 case "entropic-culled-burst":
-                    // TODO: pass adviseBurstLength: 16 once PTK stage 5 lands.
+                    // Alias of "entropic-culled": PTK's per-entry burst model was superseded by the generation ratio.
                     admission = .featureOwnership; base = { [EntropicWeightPolicy()] }
                 case "boundary-culled":
                     // Cull over both the (namespaced) features and the cmp
@@ -257,7 +258,7 @@ private func runFuzz(
                     admission = .featureOwnership; base = { [] }
                 }
                 let probe = env["PTK_POOL_PROBE"] == "1"
-                return .weightedPool(
+                return MutationScheduler.weightedPool(
                     admission: admission,
                     policies: {
                         var policies = base()
@@ -268,7 +269,6 @@ private func runFuzz(
                         }
                         return policies
                     },
-                    focusOnInsert: env["PTK_FOCUS_ON_INSERT"] != "0",
                     capacity: env["PTK_POOL_CAPACITY"].flatMap(Int.init)
                 )
             }(),

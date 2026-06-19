@@ -250,10 +250,11 @@ private func runFuzz(
                     // Alias of "entropic-culled": PTK's per-entry burst model was superseded by the generation ratio.
                     admission = .featureOwnership; base = { [EntropicWeightPolicy()] }
                 case "boundary-culled":
-                    // Cull over both the (namespaced) features and the cmp
-                    // boundary distances — the admission half of a composed
-                    // cmp×edge strategy.
-                    admission = .boundaryDistanceOwnership; base = { [] }
+                    // featureOwnership now culls over BOTH edges and cmp boundary
+                    // distances (its BoundaryDistanceEvaluator is inert unless the
+                    // strategy publishes distances), so the boundary axis is driven
+                    // entirely by pairing this with a cmp strategy (e.g. ptk-boundary).
+                    admission = .featureOwnership; base = { [] }
                 default:
                     admission = .featureOwnership; base = { [] }
                 }
